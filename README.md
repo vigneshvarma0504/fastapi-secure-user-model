@@ -43,3 +43,4 @@ The Docker image for this application is pushed to Docker Hub upon successful co
     ```
 2. **Access:** The application will be available at `http://localhost:8000`. Access the interactive documentation at `http://localhost:8000/docs`.
 
+
