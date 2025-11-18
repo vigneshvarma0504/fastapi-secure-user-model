@@ -6,6 +6,11 @@ from app.database import Base, get_db
 from app.main import app
 from app import models
 import os
+import sys
+
+# Ensure the root directory is on the path for finding 'app'
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 
 # --- Fixture for Unit/Schema Testing (SQLite) ---
 
@@ -56,8 +61,6 @@ def client(db_session):
 
 @pytest.fixture(scope="session")
 def integration_db_session():
-    # Use the dedicated environment variable for integration tests (Postgres)
-    # This will be set in the GitHub Actions workflow
     db_url = os.getenv("TEST_DATABASE_URL") 
     if not db_url:
         pytest.skip("TEST_DATABASE_URL not set for integration tests.")
@@ -83,9 +86,8 @@ def integration_db_session():
 
     # Clean up: drop all tables after integration tests (careful with this!)
     models.Base.metadata.drop_all(bind=integration_engine)
-    app.dependency_overrides.clear() # Clear the override
+    app.dependency_overrides.clear()
     
 @pytest.fixture(scope="session")
 def integration_client():
-    # A dedicated client for integration tests
     return TestClient(app)

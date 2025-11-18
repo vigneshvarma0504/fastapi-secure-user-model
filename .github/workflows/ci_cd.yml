@@ -17,17 +17,18 @@ jobs:
       POSTGRES_USER: ci_user
       POSTGRES_PASSWORD: ci_password
       POSTGRES_DB: ci_db
+      # FIX: The application itself (app/main.py) uses this URL for initialization. 
+      # Must use port 5433 to match the service mapping below.
+      DATABASE_URL: postgresql://ci_user:ci_password@localhost:5433/ci_db
       
     services:
-      # Start a PostgreSQL container for integration tests
       postgres:
         image: postgres:14-alpine
         env:
           POSTGRES_USER: ${{ env.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
           POSTGRES_DB: ${{ env.POSTGRES_DB }}
-        # FIX: Map the internal port (5432) to an external port (5433)
-        # to avoid the "port is already allocated" error on the runner.
+        # FIX: Map the internal port (5432) to an external port (5433) to avoid conflict.
         ports:
           - 5433:5432 
         options: >-
@@ -48,9 +49,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          # Use pip install -r requirements.txt to install all dependencies
           pip install -r requirements.txt
-          # Also install the pydantic[email] dependency explicitly (best practice)
+          # FIX: Explicitly install the pydantic[email] dependency needed for EmailStr
           pip install 'pydantic[email]'
 
       - name: Wait for PostgreSQL to be ready
@@ -62,8 +62,7 @@ jobs:
         
       - name: Run Tests (Unit and Integration)
         env:
-          # Set the database URL for the tests to connect to the CI Postgres container
-          # NOTE: The host port MUST match the port used above (5433)
+          # TEST_DATABASE_URL must match the exposed port 5433
           TEST_DATABASE_URL: postgresql://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5433/${{ env.POSTGRES_DB }}
         run: |
           # Use python -m pytest to avoid the ModuleNotFoundError
@@ -73,7 +72,6 @@ jobs:
         uses: docker/setup-buildx-action@v3
         
       - name: Log in to Docker Hub
-        # Only run deployment on successful push to 'main'
         if: success() && github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
         with:
@@ -81,12 +79,11 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and Push Docker image
-        # Only run deployment on successful push to 'main'
         if: success() && github.ref == 'refs/heads/main'
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          
+          # !!! REPLACE vigneshvarma05 WITH YOUR DOCKER HUB USERNAME !!!
           tags: vigneshvarma05/fastapi-secure-app:latest 
           file: Dockerfile

@@ -18,7 +18,7 @@ def create_new_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
             detail="Email already registered"
         )
     
-    # Check for existing user by username (Optional, but good practice)
+    # Check for existing user by username
     db_user_by_username = db.query(models.User).filter(models.User.username == user.username).first()
     if db_user_by_username:
         raise HTTPException(
