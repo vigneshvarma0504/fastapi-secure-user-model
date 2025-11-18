@@ -64,7 +64,7 @@ jobs:
         env:
           # Set the database URL for the tests to connect to the CI Postgres container
           # NOTE: The host port MUST match the port used above (5433)
-          TEST_DATABASE_URL: postgresql://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5433/${{ env.POSTRES_DB }}
+          TEST_DATABASE_URL: postgresql://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5433/${{ env.POSTGRES_DB }}
         run: |
           # Use python -m pytest to avoid the ModuleNotFoundError
           python -m pytest tests/
