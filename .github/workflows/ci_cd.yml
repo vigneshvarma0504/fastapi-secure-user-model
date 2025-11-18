@@ -103,65 +103,94 @@ jobs:
 
         run: |
 
-          while ! nc -z localhost 5432; do   
+  name: CI/CD Pipeline
 
-            sleep 1 
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
-          done
-
-        
-
-      - name: Run Tests (Unit and Integration)
-
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    
+    # Define environment variables for the database used in integration tests
+    env:
+      POSTGRES_USER: ci_user
+      POSTGRES_PASSWORD: ci_password
+      POSTGRES_DB: ci_db
+      
+    services:
+      # Start a PostgreSQL container for integration tests
+      postgres:
+        image: postgres:14-alpine
         env:
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+        # FIX: Map the internal port (5432) to an external port (5433)
+        # to avoid the "port is already allocated" error on the runner.
+        ports:
+          - 5433:5432 
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
-          # Set the database URL for the tests to connect to the CI Postgres container
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-          TEST_DATABASE_URL: postgresql://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
-
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install dependencies
         run: |
+          python -m pip install --upgrade pip
+          # Use pip install -r requirements.txt to install all dependencies
+          pip install -r requirements.txt
+          # Also install the pydantic[email] dependency explicitly (best practice)
+          pip install 'pydantic[email]'
 
-          pytest tests/
-
-
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          # Wait for connection to the mapped port 5433
+          while ! nc -z localhost 5433; do   
+            sleep 1 
+          done
+        
+      - name: Run Tests (Unit and Integration)
+        env:
+          # Set the database URL for the tests to connect to the CI Postgres container
+          # NOTE: The host port MUST match the port used above (5433)
+          TEST_DATABASE_URL: postgresql://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5433/${{ env.POSTRES_DB }}
+        run: |
+          # Use python -m pytest to avoid the ModuleNotFoundError
+          python -m pytest tests/
 
       - name: Set up Docker Buildx
-
         uses: docker/setup-buildx-action@v3
-
         
-
       - name: Log in to Docker Hub
-
         # Only run deployment on successful push to 'main'
-
         if: success() && github.ref == 'refs/heads/main'
-
         uses: docker/login-action@v3
-
         with:
-
-          username: ${{ secrets.DOCKER_USERNAME }} # Needs to be set in GitHub Secrets
-
-          password: ${{ secrets.DOCKER_PASSWORD }} # Needs to be set in GitHub Secrets
-
-
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build and Push Docker image
-
         # Only run deployment on successful push to 'main'
-
         if: success() && github.ref == 'refs/heads/main'
-
         uses: docker/build-push-action@v5
-
         with:
-
           context: .
-
           push: true
-
-          tags: vigneshvarma05/fastapi-secure-app:latest # REPLACE with your DockerUsername
-
+          tags: vigneshvarma05/fastapi-secure-app:latest 
           file: Dockerfile
-
